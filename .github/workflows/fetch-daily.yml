@@ -1,0 +1,42 @@
+name: 抓取每日行情
+
+on:
+  schedule:
+    - cron: '0 10 * * 1-5'   # 週一到週五 UTC 10:00 = 台北 18:00；GitHub 排程可能延遲數分鐘到一小時
+  workflow_dispatch:
+    inputs:
+      dates:
+        description: '補抓日期（YYYY-MM-DD，多個用空白分隔；留空為今天）'
+        required: false
+        default: ''
+
+permissions:
+  contents: write
+
+concurrency:
+  group: fetch-daily
+  cancel-in-progress: false
+
+jobs:
+  fetch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: 抓取資料
+        env:
+          DATES: ${{ inputs.dates }}
+        run: python3 scripts/fetch_daily.py $DATES
+
+      - name: 提交新資料
+        run: |
+          git add data
+          if git diff --cached --quiet; then
+            echo "沒有新資料"
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git commit -m "data: $(git diff --cached --name-only -- 'data/2*.json' | xargs -r -n1 basename | sed 's/\.json$//' | sort | tr '\n' ' ')"
+          git pull --rebase -q
+          git push

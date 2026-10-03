@@ -1,0 +1,47 @@
+name: 補抓歷史資料
+
+on:
+  workflow_dispatch:
+    inputs:
+      since:
+        description: '最早日期（YYYY-MM-DD），從昨天往回抓到這天，已有的日期跳過'
+        required: true
+      until:
+        description: '最晚日期（YYYY-MM-DD，留空為昨天）'
+        required: false
+        default: ''
+
+permissions:
+  contents: write
+
+concurrency:
+  group: fetch-daily            # 與每日排程共用，避免同時推送
+  cancel-in-progress: false
+
+jobs:
+  backfill:
+    runs-on: ubuntu-latest
+    timeout-minutes: 340
+    steps:
+      - uses: actions/checkout@v5
+
+      # 每 40 分鐘提交一次進度；被擋或抓完就停，下次執行會從沒抓到的日期繼續
+      - name: 補抓並分段提交
+        env:
+          SINCE: ${{ inputs.since }}
+          UNTIL: ${{ inputs.until }}
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          for round in 1 2 3 4 5 6 7; do
+            rc=0
+            python3 scripts/fetch_daily.py --since "$SINCE" ${UNTIL:+--until "$UNTIL"} --max-minutes 40 || rc=$?
+            git add data
+            if ! git diff --cached --quiet; then
+              git commit -m "data: 補抓 $SINCE 起（第 $round 段）"
+              git pull --rebase -q
+              git push
+            fi
+            if [ "$rc" -eq 4 ]; then echo "::warning::疑似被交易所擋下，已保留進度，稍後再執行一次即可續抓"; exit 0; fi
+            if [ "$rc" -ne 3 ]; then exit "$rc"; fi
+          done
