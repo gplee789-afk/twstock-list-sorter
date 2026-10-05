@@ -17,7 +17,7 @@
 | --- | --- |
 | `index.html` | 網頁版本體，由 GitHub Pages 發布 |
 | `scripts/fetch_daily.py` | 抓取每日行情與三大法人資料，存到 `data/` |
-| `.github/workflows/fetch-daily.yml` | GitHub Actions 排程：每個交易日 18:00 自動執行上面的程式 |
+| `.github/workflows/fetch-daily.yml` | GitHub Actions 排程：每個交易日 18:07 起自動執行上面的程式（一晚 4 次） |
 | `.github/workflows/backfill.yml` | 手動執行：補抓一段期間的歷史資料 |
 | `data/` | 自動抓取的每日資料、歷史指標（`hist/`）與產業分類（`industry.json`），網頁版會直接讀取 |
 
@@ -82,7 +82,7 @@
 
 ## 自動資料
 
-GitHub Actions 每個交易日台北時間 18:00（GitHub 排程可能延遲）執行 `scripts/fetch_daily.py`，從證交所與櫃買中心抓取當天的行情與三大法人資料，存成 `data/YYYY-MM-DD.json` 並提交到 repo。網頁版打開時會直接讀取這些資料，不需要下載任何檔案。
+GitHub Actions 每個交易日台北時間 18:07、18:37、19:17、21:07 各執行一次 `scripts/fetch_daily.py`（GitHub 排程可能延遲，甚至跳過某一次），從證交所與櫃買中心抓取當天的行情與三大法人資料。每次都會檢查最近 7 天，已經抓完整的日期跳過，漏掉的或法人還沒公布的會自動補上。資料存成 `data/YYYY-MM-DD.json` 並提交到 repo。網頁版打開時會直接讀取這些資料，不需要下載任何檔案。
 
 - **重抓某幾天：** 到 repo 的 **Actions → 抓取每日行情 → Run workflow**，在「補抓日期」填 `2026-10-01` 這樣的日期（多個用空白分隔），留空為今天。
 - **補抓一段期間：** 到 **Actions → 補抓歷史資料 → Run workflow**，填最早日期（例如一年前）。會從昨天往回抓，已有的日期自動跳過，每 40 分鐘提交一次進度。請求之間至少間隔 4 秒；遇到阻擋時會等 1、3、10 分鐘再試，連續失敗就先停下，之後再執行一次即可從中斷處繼續。

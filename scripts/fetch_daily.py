@@ -443,7 +443,15 @@ def main():
 
     if a.delay:
         DELAY = a.delay
-    days = [datetime.date.fromisoformat(s) for s in a.dates] or [datetime.datetime.now(TAIPEI).date()]
+    if a.dates:
+        days = [datetime.date.fromisoformat(s) for s in a.dates]
+    else:
+        # 排程一天跑好幾次：今天加上最近 7 天裡還不完整的平日（漏跑或法人晚公布時自動補上），已完整的跳過
+        today = datetime.datetime.now(TAIPEI).date()
+        days = [d for d in (today - datetime.timedelta(days=k) for k in range(7, -1, -1))
+                if d.weekday() < 5 and not complete(d)]
+        if not days:
+            print('最近 7 天的資料都已完整')
     for d in days:
         fetch_day(d)
     if DATA.exists():
